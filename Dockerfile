@@ -13,17 +13,17 @@ RUN git clone --depth=1 https://github.com/amnezia-vpn/amneziawg-tools.git && \
 
 RUN cd /go/amneziawg-tools/src && make
 RUN cd /go/amneziawg-go && make
+RUN mkdir -p /tmp/build/usr/bin/ \
+    && mv /go/amneziawg-go/amneziawg-go /tmp/build/usr/bin/amneziawg-go \
+    && mv /go/amneziawg-tools/src/wg /tmp/build/usr/bin/awg \
+    && mv /go/amneziawg-tools/src/wg-quick/linux.bash /tmp/build/usr/bin/awg-quick
+COPY wireguard-fs /tmp/build/
 
 # FINAL IMAGE
 FROM alpine:${ALPINE_VERSION}
-# не нужен iproute2
-RUN apk update && apk add --no-cache bash openrc iptables iptables-legacy openresolv \ 
-    && mkdir -p /etc/amnezia/amneziawg/
+RUN apk update && apk add --no-cache bash openrc iptables iptables-legacy openresolv iproute2
 
-COPY --from=builder /go/amneziawg-go/amneziawg-go /usr/bin/amneziawg-go
-COPY --from=builder /go/amneziawg-tools/src/wg /usr/bin/awg
-COPY --from=builder /go/amneziawg-tools/src/wg-quick/linux.bash /usr/bin/awg-quick
-COPY wireguard-fs /
+COPY --from=builder /tmp/build/ /
 
 RUN \
   sed -i 's/^\(tty\d\:\:\)/#\1/' /etc/inittab && \
@@ -37,16 +37,16 @@ RUN \
   /lib/rc/sh/init.sh && \
   rm \
   /etc/init.d/hwdrivers \
-  /etc/init.d/machine-id
-RUN    sed -i 's/cmd sysctl -q \(.*\?\)=\(.*\)/[[ "$(sysctl -n \1)" != "\2" ]] \&\& \0/' /usr/bin/awg-quick
-RUN \
-  ln -s /sbin/iptables-legacy /bin/iptables && \
-  ln -s /sbin/iptables-legacy-save /bin/iptables-save && \
-  ln -s /sbin/iptables-legacy-restore /bin/iptables-restore
-# register /etc/init.d/wg-quick
-RUN rc-update add wg-quick default
-
-RUN echo -e " \n\
+  /etc/init.d/machine-id && \
+  #
+  rm /sbin/iptables /sbin/iptables-save /sbin/iptables-restore && \
+  ln -s /sbin/iptables-legacy /sbin/iptables && \
+  ln -s /sbin/iptables-legacy-save /sbin/iptables-save && \
+  ln -s /sbin/iptables-legacy-restore /sbin/iptables-restore && \
+  #
+  sed -i 's/cmd sysctl -q \(.*\?\)=\(.*\)/[[ "$(sysctl -n \1)" != "\2" ]] \&\& \0/' /usr/bin/awg-quick && \
+  #
+  echo -e " \n\
     # Note, that syncookies is fallback facility. It MUST NOT be used to help highly loaded servers to stand against legal connection rate.\n\
     net.ipv4.tcp_syncookies = 0 \n\
     net.ipv4.tcp_keepalive_time = 600 \n\
@@ -61,9 +61,13 @@ RUN echo -e " \n\
     # Controls TCP Packetization-Layer Path MTU Discovery. Takes three values: 0 - Disabled 1 - Disabled by default, enabled when an ICMP black hole detected 2 - Always enabled, use initial MSS of tcp_base_mss.\n\
     net.ipv4.tcp_mtu_probing = 1 \n\
     # net.ipv4.tcp_congestion_control = bbr # not yet supported by mikrotik https://forum.mikrotik.com/viewtopic.php?t=165325 \n\
-    " | sed -e 's/^\s\+//g' | tee -a /etc/sysctl.conf \
-    && sysctl -p
+    " | sed -e 's/^\s\+//g' | tee -a /etc/sysctl.conf && \
+  sysctl -p && \
+  #
+  mkdir -p /etc/amnezia/amneziawg/ && \
+  #
+  rc-update add wg-quick default
 
 VOLUME ["/sys/fs/cgroup"]
-HEALTHCHECK --interval=5m --timeout=30s CMD /bin/bash /data/healthcheck.sh
+HEALTHCHECK --interval=5m --timeout=30s CMD /bin/bash /data/healthcheck.shnfr 
 CMD ["/sbin/init"]

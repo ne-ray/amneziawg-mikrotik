@@ -1,5 +1,8 @@
 ### https://hub.docker.com/r/wiktorbgu/amneziawg-mikrotik
 
+> ## AmneziaWG protocol configuration
+> ### It is important to remember that the parameters S1, S2 and H1, H2, H3, H4 must remain equal to the specified values ​​on the client and on the server (otherwise nothing will work), and you can change the parameters J as you like, but Jc must be from 1 to 128, the value of Jmin must not exceed Jmax, and Jmax must not be more than 1280.
+
 ## Mikrotik settings
 
 ```/interface/bridge add name=Bridge-Docker port-cost-mode=short
@@ -16,12 +19,11 @@
 
 /container/add remote-image=wiktorbgu/amneziawg-mikrotik interface=AMNEZIAWG root-dir=/usb1/docker/amneziawg start-on-boot=yes logging=yes mounts=amnezia_wg_conf
 ```
-### To save disk space on the ARM64 platform (35Mb), you can use an ARM image (17Mb)!
-```
-/container/add remote-image=wiktorbgu/amneziawg-mikrotik:arm interface=AMNEZIAWG root-dir=/usb1/docker/amneziawg start-on-boot=yes logging=yes mounts=amnezia_wg_conf
-```
 # CLIENT MODE
-### awg.conf EXAMPLE 
+### awg.conf EXAMPLE - any file name is used automatically (not very long)
+> ### Attention!
+> In this configuration the parameters S1 S2 H1 H2 H3 H4 are specified for connecting to a standard WG server with the addition of garbage packets Jc Jmin Jmax to try to bypass DPI!
+If you are using an AWG server, read the message above `AmneziaWG protocol configuration`
 ```
 [Interface]
 PrivateKey = ====================KEY=====================
@@ -43,21 +45,16 @@ PostUp = iptables -t nat -A POSTROUTING -o %i -j MASQUERADE
 # Del IP masquerading
 PostDown = iptables -t nat -D POSTROUTING -o %i -j MASQUERADE
 
-# Replace 192.168.254.1 with your router IP address in the bridge where the container is located
-# exclude local networks
-PreUp = ip route add 10.0.0.0/8 via 192.168.254.1 dev eth0
-PreUp = ip route add 172.16.0.0/12 via 192.168.254.1 dev eth0
-PreUp = ip route add 192.168.0.0/16 via 192.168.254.1 dev eth0
-
-# Here is the IP of the Endpoint
-PreUp = ip route add IP_SERVER_WG via 192.168.254.1 dev eth0
+Table = awg
+PostUp = ip rule add priority 300 from all iif eth0 lookup awg || true
+PostDown = ip rule del from all iif eth0 lookup awg || true
 
 [Peer]
 PublicKey = ====================KEY=====================
 PresharedKey = ====================KEY=====================
-AllowedIPs =  0.0.0.0/1, 128.0.0.0/1 # don't use 0.0.0.0/0
+AllowedIPs =  0.0.0.0/0
 PersistentKeepalive = 25
-Endpoint = IP_SERVER_WG:PORT
+Endpoint = IP_OR_DNS_SERVER_WG:PORT
 ```
 
 ### Save EXAMPLE to file awg.conf to path /usb1/docker_configs/amnezia_wg_conf
@@ -65,11 +62,57 @@ Endpoint = IP_SERVER_WG:PORT
 ```
 /container start [find interface=AMNEZIAWG]
 ```
+## For check client status
+### Open console container and use command `awg`
+```
+/container shell [find interface=AMNEZIAWG status=running]
 
+MikroTik:/# awg
+interface: warp
+  public key: xxxxxxxxxxxxxxxxxxxxxxxxxxxOzOZZiqt6s/s0H1wpQZXA=
+  private key: (hidden)
+  listening port: 45706
+  jc: 6
+  jmin: 50
+  jmax: 1000
+
+peer: xxxxxxxxxxxxxxxxxxxxxxxxxxxtzH0JuVo51h2wPfgyo=
+  endpoint: 162.159.192.1:2408
+  allowed ips: 0.0.0.0/1, 128.0.0.0/1
+  latest handshake: 3 seconds ago
+  transfer: 92 B received, 5.72 KiB sent
+  persistent keepalive: every 25 seconds
+
+# or info for real awg server
+
+MikroTik:/# awg
+interface: warp
+  public key: xxxxxxxxxxxxxxxxxxxxxxxxxxxDOTg1URsTQDtJ0nc=
+  private key: (hidden)
+  listening port: 44730
+  jc: 6
+  jmin: 50
+  jmax: 1000
+  s1: 30
+  s2: 71
+  h1: 1787607718
+  h2: 2134371398
+  h3: 207168052
+  h4: 2022740759
+
+peer: xxxxxxxxxxxxxxxxxxxxxxxxxxx9vDcaOOqSsRCk=
+  preshared key: (hidden)
+  endpoint: xx.xx.66.55:54937
+  allowed ips: 0.0.0.0/1, 128.0.0.0/1
+  latest handshake: 6 seconds ago
+  transfer: 92 B received, 4.21 KiB sent
+  persistent keepalive: every 16 seconds
+
+```
 # SERVER MODE
 
 ### Genetate config on site https://www.wireguardconfig.com/
-### awg0.conf EXAMPLE 
+### awg0.conf EXAMPLE - any file name is used automatically (not very long)
 ```
 [Interface]
 Address = 10.0.0.1/24
@@ -90,6 +133,10 @@ PostUp = iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE
 # Del IP masquerading
 PostDown = iptables -t nat -D POSTROUTING -o eth0 -j MASQUERADE
 
+Table = awg
+PostUp = ip rule add priority 300 from all iif eth0 lookup awg || true
+PostDown = ip rule del from all iif eth0 lookup awg || true
+
 [Peer]
 PublicKey = hVneLKyyM/v3ZJf4j5CA1C5J4y+cHt0b92BlaH24wyw=
 AllowedIPs = 10.0.0.2/32
@@ -104,6 +151,12 @@ AllowedIPs = 10.0.0.4/32
 ```
 
 ### Save EXAMPLE to file awg0.conf to path /usb1/docker_configs/amnezia_wg_conf
+### For connect to the server AWG from internet
+Dst-nat with simple change external port for connections `It is better to use a non-standard port`
+```
+/ip firewall nat add action=dst-nat chain=dstnat comment="DST-NAT to AmneziaWG container" dst-port=14243 in-interface=ether1-wan protocol=udp to-addresses=192.168.254.4 to-ports=51820
+```
+
 ### And RUN container
 ```
 /container start [find interface=AMNEZIAWG]
@@ -128,8 +181,42 @@ MTU = 1420
 [Peer]
 PublicKey = KB3AhYqcsckbvXSX5gvUqsk8gQyPIf409pc4KdaLqhc=
 AllowedIPs = 0.0.0.0/1, 128.0.0.0/1
-Endpoint = 192.168.254.4:51820
+Endpoint = EXTERNAL_INTERNET_IP:DST_NAT_PORT # or container ip and port for testing connect in local network mikrotik
 PersistentKeepalive = 16
 ```
+## For check server status
+### Open console container and use command `awg`
+```
+/container shell [find interface=AMNEZIAWG status=running]
+
+MikroTik:/# awg
+interface: wg0
+  public key: KB3AhYqcsckbvXSX5gvUqsk8gQyPIf409pc4KdaLqhc=
+  private key: (hidden)
+  listening port: 51820
+  jc: 4
+  jmin: 50
+  jmax: 1000
+  s1: 146
+  s2: 42
+  h1: 532916466
+  h2: 2096090865
+  h3: 406337014
+  h4: 57583056
+
+peer: hVneLKyyM/v3ZJf4j5CA1C5J4y+cHt0b92BlaH24wyw=
+  endpoint: xx.xxx.44.106:30544
+  allowed ips: 10.0.0.2/32
+  latest handshake: 3 seconds ago
+  transfer: 626.09 KiB received, 5.33 MiB sent
+
+peer: SBx4YTAAsHoxtHIXMxT0Xd/tAKxO24fDP5pVWCKvS3M=
+  allowed ips: 10.0.0.4/32
+
+peer: LZxKz1UWe70dKAIzJPBDIKA7Opk8nuolLxq80WDcbnA=
+  allowed ips: 10.0.0.3/32
+
+```
+
 # Speed test on server mode
 ![Speed test on server mode](https://i.ibb.co/hBqcNYd/amnezia-server-mikrotik-speedtest.jpg)
