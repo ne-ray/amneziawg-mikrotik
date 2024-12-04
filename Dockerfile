@@ -6,7 +6,7 @@ FROM golang:${GOLANG_VERSION}-alpine${ALPINE_VERSION} AS builder
 
 WORKDIR /go
 
-RUN apk update && apk add --no-cache git make bash build-base linux-headers
+RUN apk add --no-cache git make bash build-base linux-headers
 
 RUN git clone --depth=1 https://github.com/amnezia-vpn/amneziawg-tools.git && \
     git clone --depth=1 https://github.com/amnezia-vpn/amneziawg-go.git
@@ -21,7 +21,7 @@ COPY wireguard-fs /tmp/build/
 
 # FINAL IMAGE
 FROM alpine:${ALPINE_VERSION}
-RUN apk update && apk add --no-cache bash openrc iptables iptables-legacy openresolv iproute2
+RUN apk add --no-cache bash openrc iptables iptables-legacy openresolv iproute2
 
 COPY --from=builder /tmp/build/ /
 
@@ -38,11 +38,16 @@ RUN \
   rm \
   /etc/init.d/hwdrivers \
   /etc/init.d/machine-id && \
-  #
+  # IPv4
   rm /sbin/iptables /sbin/iptables-save /sbin/iptables-restore && \
   ln -s /sbin/iptables-legacy /sbin/iptables && \
   ln -s /sbin/iptables-legacy-save /sbin/iptables-save && \
   ln -s /sbin/iptables-legacy-restore /sbin/iptables-restore && \
+  # IPv6
+  rm /sbin/ip6tables /sbin/ip6tables-save /sbin/ip6tables-restore && \
+  ln -s /sbin/ip6tables-legacy /sbin/ip6tables && \
+  ln -s /sbin/ip6tables-legacy-save /sbin/ip6tables-save && \
+  ln -s /sbin/ip6tables-legacy-restore /sbin/ip6tables-restore && \
   #
   sed -i 's/cmd sysctl -q \(.*\?\)=\(.*\)/[[ "$(sysctl -n \1)" != "\2" ]] \&\& \0/' /usr/bin/awg-quick && \
   #
