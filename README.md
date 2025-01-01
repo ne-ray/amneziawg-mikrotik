@@ -45,6 +45,8 @@ PostUp = iptables -t nat -A POSTROUTING -o %i -j MASQUERADE
 # Del IP masquerading
 PostDown = iptables -t nat -D POSTROUTING -o %i -j MASQUERADE
 
+PreUp=iptables -A FORWARD -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu
+
 Table = awg
 PostUp = ip rule add priority 300 from all iif eth0 lookup awg || true
 PostDown = ip rule del from all iif eth0 lookup awg || true
@@ -132,6 +134,8 @@ H4 = 57583056
 PostUp = iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE
 # Del IP masquerading
 PostDown = iptables -t nat -D POSTROUTING -o eth0 -j MASQUERADE
+
+PreUp=iptables -A FORWARD -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu
 
 Table = awg
 PostUp = ip rule add priority 300 from all iif eth0 lookup awg || true
