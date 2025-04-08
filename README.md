@@ -45,8 +45,12 @@ PostUp = iptables -t nat -A POSTROUTING -o %i -j MASQUERADE
 # Del IP masquerading
 PostDown = iptables -t nat -D POSTROUTING -o %i -j MASQUERADE
 
-PreUp=iptables -A FORWARD -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu
+# Add clamp mss to pmtu
+PostUp = iptables -A FORWARD -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu
+# Del clamp mss to pmtu
+PostDown = iptables -D FORWARD -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu
 
+# route over other table
 Table = awg
 PostUp = ip rule add priority 300 from all iif eth0 lookup awg || true
 PostDown = ip rule del from all iif eth0 lookup awg || true
@@ -135,7 +139,11 @@ PostUp = iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE
 # Del IP masquerading
 PostDown = iptables -t nat -D POSTROUTING -o eth0 -j MASQUERADE
 
-PreUp=iptables -A FORWARD -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu
+# Add clamp mss to pmtu
+PostUp = iptables -A FORWARD -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu
+# Del clamp mss to pmtu
+PostDown = iptables -D FORWARD -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu
+
 
 Table = awg
 PostUp = ip rule add priority 300 from all iif eth0 lookup awg || true

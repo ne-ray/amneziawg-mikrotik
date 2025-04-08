@@ -1,5 +1,5 @@
-ARG GOLANG_VERSION=1.23
-ARG ALPINE_VERSION=3.20
+ARG GOLANG_VERSION=1.24
+ARG ALPINE_VERSION=3.21
 
 # BUILD IMAGE
 FROM golang:${GOLANG_VERSION}-alpine${ALPINE_VERSION} AS builder
@@ -21,11 +21,10 @@ COPY wireguard-fs /tmp/build/
 
 # FINAL IMAGE
 FROM alpine:${ALPINE_VERSION}
-RUN apk add --no-cache bash openrc iptables iptables-legacy openresolv iproute2
 
 COPY --from=builder /tmp/build/ /
 
-RUN \
+RUN apk add --no-cache bash openrc iptables iptables-legacy openresolv iproute2 && \
   sed -i 's/^\(tty\d\:\:\)/#\1/' /etc/inittab && \
   sed -i \
   -e 's/^#\?rc_env_allow=.*/rc_env_allow="\*"/' \
@@ -34,20 +33,20 @@ RUN \
   sed -i \
   -e 's/VSERVER/DOCKER/' \
   -e 's/checkpath -d "$RC_SVCDIR"/mkdir "$RC_SVCDIR"/' \
-  /lib/rc/sh/init.sh && \
+  /usr/libexec/rc/sh/init.sh && \
   rm \
   /etc/init.d/hwdrivers \
   /etc/init.d/machine-id && \
   # IPv4
-  rm /sbin/iptables /sbin/iptables-save /sbin/iptables-restore && \
-  ln -s /sbin/iptables-legacy /sbin/iptables && \
-  ln -s /sbin/iptables-legacy-save /sbin/iptables-save && \
-  ln -s /sbin/iptables-legacy-restore /sbin/iptables-restore && \
+  rm /usr/sbin/iptables /usr/sbin/iptables-save /usr/sbin/iptables-restore && \
+  ln -s /usr/sbin/iptables-legacy /usr/sbin/iptables && \
+  ln -s /usr/sbin/iptables-legacy-save /usr/sbin/iptables-save && \
+  ln -s /usr/sbin/iptables-legacy-restore /usr/sbin/iptables-restore && \
   # IPv6
-  rm /sbin/ip6tables /sbin/ip6tables-save /sbin/ip6tables-restore && \
-  ln -s /sbin/ip6tables-legacy /sbin/ip6tables && \
-  ln -s /sbin/ip6tables-legacy-save /sbin/ip6tables-save && \
-  ln -s /sbin/ip6tables-legacy-restore /sbin/ip6tables-restore && \
+  rm /usr/sbin/ip6tables /usr/sbin/ip6tables-save /usr/sbin/ip6tables-restore && \
+  ln -s /usr/sbin/ip6tables-legacy /usr/sbin/ip6tables && \
+  ln -s /usr/sbin/ip6tables-legacy-save /usr/sbin/ip6tables-save && \
+  ln -s /usr/sbin/ip6tables-legacy-restore /usr/sbin/ip6tables-restore && \
   #
   sed -i 's/cmd sysctl -q \(.*\?\)=\(.*\)/[[ "$(sysctl -n \1)" != "\2" ]] \&\& \0/' /usr/bin/awg-quick && \
   #
