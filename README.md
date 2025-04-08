@@ -5,7 +5,8 @@
 
 ## Mikrotik settings
 
-```/interface/bridge add name=Bridge-Docker port-cost-mode=short
+```
+/interface/bridge add name=Bridge-Docker port-cost-mode=short
 /ip/address add address=192.168.254.1/24 interface=Bridge-Docker network=192.168.254.0
 /interface/veth add address=192.168.254.4/24 gateway=192.168.254.1 name=AMNEZIAWG
 /interface/bridge/port add bridge=Bridge-Docker interface=AMNEZIAWG
