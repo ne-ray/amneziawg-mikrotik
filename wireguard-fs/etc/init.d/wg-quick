@@ -2,10 +2,10 @@
 
 description="Amnezia WG Quick Up"
 
-depend() {
-    need localmount
-    need net
-}
+# depend() {
+#     need localmount
+#     need net
+# }
 
 start_pre()
 {
